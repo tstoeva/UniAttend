@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: uniattend
+      POSTGRES_PASSWORD: uniattend
+      POSTGRES_DB: uniattend
+    ports:
+      - "5432:5432"
+    volumes:
+      - uniattend_pg:/var/lib/postgresql/data
+volumes:
+  uniattend_pg:

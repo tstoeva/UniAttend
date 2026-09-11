@@ -1,0 +1,12 @@
+node_modules
+.env
+.DS_Store
+backend/dist
+backend/uploads/*
+!backend/uploads/.gitkeep
+web/dist
+*.tsbuildinfo
+ios/*.xcodeproj
+ios/*.xcworkspace
+wallet/certs/*
+!wallet/certs/.gitkeep

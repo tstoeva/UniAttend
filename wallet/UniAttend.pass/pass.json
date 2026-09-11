@@ -1,0 +1,20 @@
+{
+  "formatVersion": 1,
+  "passTypeIdentifier": "pass.com.example.uniattend",
+  "serialNumber": "DEMO",
+  "teamIdentifier": "DEMO",
+  "organizationName": "Demo University",
+  "description": "UniAttend AI Student Card",
+  "logoText": "UniAttend AI",
+  "foregroundColor": "rgb(255,255,255)",
+  "backgroundColor": "rgb(23,66,45)",
+  "labelColor": "rgb(190,230,205)",
+  "storeCard": {
+    "primaryFields": [],
+    "secondaryFields": [],
+    "auxiliaryFields": [],
+    "backFields": [
+      {"key":"about","label":"ABOUT","value":"University student credential for the UniAttend AI attendance platform."}
+    ]
+  }
+}

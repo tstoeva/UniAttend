@@ -1,0 +1,10 @@
+{
+  "name": "uniattend-ai-mvp",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:web": "npm --prefix web run dev",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down"
+  }
+}

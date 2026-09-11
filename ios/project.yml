@@ -1,0 +1,22 @@
+name: UniAttendAI
+options:
+  bundleIdPrefix: com.example
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+targets:
+  UniAttendAI:
+    type: application
+    platform: iOS
+    sources: [UniAttendAI]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.UniAttendAI
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    info:
+      path: UniAttendAI/Info.plist
+      properties:
+        CFBundleDisplayName: UniAttend AI
+        UILaunchScreen: {}
+        NSCameraUsageDescription: Camera may be used for future attendance scanning features.

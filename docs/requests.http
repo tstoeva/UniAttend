@@ -1,0 +1,29 @@
+### Health
+GET http://localhost:3000/api/health
+
+### Student login
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{"email":"anna@uni.demo","password":"Student123!"}
+
+### Lecturer login
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{"email":"lecturer@uni.demo","password":"Lecturer123!"}
+
+### After login, copy accessToken below
+@token = REPLACE_ME
+
+### Student dashboard
+GET http://localhost:3000/api/student/dashboard
+Authorization: Bearer {{token}}
+
+### Student QR credential
+GET http://localhost:3000/api/attendance/credential
+Authorization: Bearer {{token}}
+
+### Lecturer dashboard
+GET http://localhost:3000/api/lecturer/dashboard
+Authorization: Bearer {{token}}

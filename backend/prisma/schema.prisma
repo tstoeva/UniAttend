@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  LECTURER
+  ADMIN
+}
+
+enum SessionStatus {
+  PLANNED
+  OPEN
+  CLOSED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum CatchupStatus {
+  READY
+  COMPLETED
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role
+  createdAt    DateTime        @default(now())
+  student      StudentProfile?
+  lecturer     LecturerProfile?
+}
+
+model StudentProfile {
+  id             String              @id @default(cuid())
+  userId         String              @unique
+  facultyNumber  String              @unique
+  program        String
+  year           Int
+  walletSerial   String              @unique @default(cuid())
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments    Enrollment[]
+  attendance     AttendanceRecord[]
+  catchups       CatchupPackage[]
+  badges         StudentBadge[]
+}
+
+model LecturerProfile {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  title    String?
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses  Course[]
+}
+
+model Course {
+  id           String          @id @default(cuid())
+  code         String          @unique
+  name         String
+  description  String?
+  lecturerId   String
+  requiredSessions Int         @default(5)
+  lecturer     LecturerProfile @relation(fields: [lecturerId], references: [id])
+  enrollments  Enrollment[]
+  sessions     ClassSession[]
+  badgeRules   BadgeRule[]
+}
+
+model Enrollment {
+  id        String         @id @default(cuid())
+  studentId String
+  courseId  String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  @@unique([studentId, courseId])
+}
+
+model ClassSession {
+  id          String              @id @default(cuid())
+  courseId    String
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime
+  room        String
+  status      SessionStatus       @default(PLANNED)
+  createdAt   DateTime            @default(now())
+  course      Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  attendance  AttendanceRecord[]
+  materials   Material[]
+  catchups    CatchupPackage[]
+}
+
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  studentId  String
+  sessionId  String
+  status     AttendanceStatus
+  checkedAt  DateTime?
+  source     String           @default("WALLET_QR")
+  student    StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session    ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@unique([studentId, sessionId])
+}
+
+model Material {
+  id          String       @id @default(cuid())
+  sessionId   String
+  title       String
+  fileName    String
+  mimeType    String
+  localPath   String
+  openaiFileId String?
+  createdAt   DateTime     @default(now())
+  session     ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model CatchupPackage {
+  id          String         @id @default(cuid())
+  studentId   String
+  sessionId   String
+  title       String
+  summary     String
+  keyConcepts Json
+  quiz        Json
+  status      CatchupStatus  @default(READY)
+  score       Int?
+  maxScore    Int?
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session     ClassSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@unique([studentId, sessionId])
+}
+
+model BadgeRule {
+  id          String  @id @default(cuid())
+  courseId    String
+  name        String
+  description String
+  benefit     String
+  requiredPresent Int
+  course      Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  badges      StudentBadge[]
+}
+
+model StudentBadge {
+  id               String         @id @default(cuid())
+  studentId        String
+  badgeRuleId      String
+  verificationCode String         @unique @default(cuid())
+  issuedAt         DateTime       @default(now())
+  student          StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  badgeRule        BadgeRule      @relation(fields: [badgeRuleId], references: [id], onDelete: Cascade)
+  @@unique([studentId, badgeRuleId])
+}
