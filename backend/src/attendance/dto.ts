@@ -1,6 +1,6 @@
 import { IsString } from 'class-validator';
 
-export class CheckInDto {
+export class RfidCheckInDto {
   @IsString() sessionId!: string;
-  @IsString() credential!: string;
+  @IsString() rfidUid!: string;
 }

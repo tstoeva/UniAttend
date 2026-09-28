@@ -1,0 +1,9 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/*.tsbuildinfo": true,
+    "ios/*.xcodeproj": true,
+    "ios/*.xcworkspace": true
+  }
+}

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import OpenAI from 'openai';
 import fs from 'fs';
 
+// Схема за структуриран изход: заглавие, резюме, ключови понятия и 5 въпроса с по 4 отговора
 const catchupSchema = {
   type: 'object',
   properties: {
@@ -31,12 +32,52 @@ const catchupSchema = {
 
 @Injectable()
 export class AiService {
-  private client?: OpenAI;
+  private client?: OpenAI; // без OPENAI_API_KEY – демо режим
+
   constructor(private config: ConfigService, private prisma: PrismaService) {
     const key = this.config.get<string>('OPENAI_API_KEY');
     if (key) this.client = new OpenAI({ apiKey: key });
   }
 
+  async generateCatchup(sessionId: string, studentId: string) {
+    const existing = await this.prisma.catchupPackage.findUnique({ where: { studentId_sessionId: { studentId, sessionId } } });
+    if (existing) return existing;
+
+    const session = await this.prisma.classSession.findUnique({ where: { id: sessionId }, include: { course: true, materials: true } });
+    if (!session) throw new Error('Session not found');
+
+    // AI само при наличен ключ и материали
+    const result = this.client && session.materials.length > 0 ? await this.askOpenAI(this.client, session) : this.demoPackage(session);
+    return this.prisma.catchupPackage.create({
+      data: { studentId, sessionId, title: result.title, summary: result.summary, keyConcepts: result.keyConcepts, quiz: result.quiz },
+    });
+  }
+
+  // Файловете се качват еднократно; openaiFileId се пази в базата
+  private async askOpenAI(client: OpenAI, session: any) {
+    const content: any[] = [];
+    for (const material of session.materials) {
+      let openaiFileId = material.openaiFileId;
+      if (!openaiFileId) {
+        openaiFileId = (await client.files.create({ file: fs.createReadStream(material.localPath), purpose: 'user_data' })).id;
+        await this.prisma.material.update({ where: { id: material.id }, data: { openaiFileId } });
+      }
+      content.push({ type: 'input_file', file_id: openaiFileId });
+    }
+    content.push({
+      type: 'input_text',
+      text: `Create a catch-up package for a university student who missed the class "${session.title}" in course "${session.course.name}". Use ONLY the supplied lecturer materials. Do not invent facts. Write the summary in clear Bulgarian unless the materials are primarily English. Include exactly five multiple-choice questions.`
+    });
+
+    const response = await client.responses.create({
+      model: this.config.get<string>('OPENAI_MODEL') || 'gpt-5.6',
+      input: [{ role: 'user', content } as any],
+      text: { format: { type: 'json_schema', name: 'smart_catchup', strict: true, schema: catchupSchema as any } },
+    });
+    return JSON.parse(response.output_text);
+  }
+
+  // Резервен пакет без AI
   private demoPackage(session: any) {
     return {
       title: `Smart Catch-up: ${session.title}`,
@@ -49,62 +90,5 @@ export class AiService {
         explanation: 'In demo mode the first answer is intentionally correct. Add OPENAI_API_KEY for material-grounded questions.'
       }))
     };
-  }
-
-  async generateCatchup(sessionId: string, studentId: string) {
-    const existing = await this.prisma.catchupPackage.findUnique({ where: { studentId_sessionId: { studentId, sessionId } } });
-    if (existing) return existing;
-
-    const session = await this.prisma.classSession.findUnique({
-      where: { id: sessionId },
-      include: { course: true, materials: true },
-    });
-    if (!session) throw new Error('Session not found');
-
-    let result: any = this.demoPackage(session);
-    if (this.client && session.materials.length > 0) {
-      const content: any[] = [];
-      for (const material of session.materials) {
-        let openaiFileId = material.openaiFileId;
-        if (!openaiFileId) {
-          const uploaded = await this.client.files.create({
-            file: fs.createReadStream(material.localPath),
-            purpose: 'user_data',
-          });
-          openaiFileId = uploaded.id;
-          await this.prisma.material.update({ where: { id: material.id }, data: { openaiFileId } });
-        }
-        content.push({ type: 'input_file', file_id: openaiFileId });
-      }
-      content.push({
-        type: 'input_text',
-        text: `Create a catch-up package for a university student who missed the class "${session.title}" in course "${session.course.name}". Use ONLY the supplied lecturer materials. Do not invent facts. Write the summary in clear Bulgarian unless the materials are primarily English. Include exactly five multiple-choice questions.`
-      });
-
-      const response = await this.client.responses.create({
-        model: this.config.get<string>('OPENAI_MODEL') || 'gpt-5.6',
-        input: [{ role: 'user', content } as any],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'smart_catchup',
-            strict: true,
-            schema: catchupSchema as any,
-          }
-        }
-      });
-      result = JSON.parse(response.output_text);
-    }
-
-    return this.prisma.catchupPackage.create({
-      data: {
-        studentId,
-        sessionId,
-        title: result.title,
-        summary: result.summary,
-        keyConcepts: result.keyConcepts,
-        quiz: result.quiz,
-      }
-    });
   }
 }

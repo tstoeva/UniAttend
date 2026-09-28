@@ -19,11 +19,11 @@ The system shall associate students with courses.
 ### FR-03 Session management
 A lecturer shall create, open and close class sessions for courses they teach.
 
-### FR-04 Attendance credential
-A student shall receive a signed digital attendance credential.
+### FR-04 RFID attendance identity
+The system shall associate a registered RFID card UID with a student.
 
 ### FR-05 Attendance check-in
-The system shall accept a credential only for an open session and an enrolled student.
+The system shall accept an RFID scan only for an open session and an enrolled student.
 
 ### FR-06 Attendance uniqueness
 At most one attendance record shall exist per student/session pair.
@@ -61,7 +61,7 @@ Attendance and badge decisions must be made server-side.
 Core attendance demo must remain functional when AI or Wallet external configuration is unavailable.
 
 ### NFR-04 Maintainability
-Credential transport (QR/NFC) must remain decoupled from attendance domain logic.
+ Credential transport must remain decoupled from attendance domain logic; QR is prototype-only future functionality.
 
 ### NFR-05 Usability
 A normal attendance scan should require no more than a few user actions.

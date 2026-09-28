@@ -1,3 +1,4 @@
+// Демо данни (npm run prisma:seed). Изтрива всички съществуващи данни.
 import { PrismaClient, Role, SessionStatus, AttendanceStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import fs from 'fs';
@@ -7,30 +8,21 @@ const prisma = new PrismaClient();
 const days = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
 
 async function main() {
-  await prisma.studentBadge.deleteMany();
-  await prisma.badgeRule.deleteMany();
-  await prisma.catchupPackage.deleteMany();
-  await prisma.material.deleteMany();
-  await prisma.attendanceRecord.deleteMany();
-  await prisma.classSession.deleteMany();
-  await prisma.enrollment.deleteMany();
+  // Останалите таблици се изтриват каскадно
   await prisma.course.deleteMany();
-  await prisma.studentProfile.deleteMany();
-  await prisma.lecturerProfile.deleteMany();
   await prisma.user.deleteMany();
 
+  // Потребители
   const studentHash = await bcrypt.hash('Student123!', 10);
   const lecturerHash = await bcrypt.hash('Lecturer123!', 10);
+  const createStudent = (firstName: string, lastName: string, email: string, profile: { facultyNumber: string; program: string; year: number; rfidUid?: string }) =>
+    prisma.user
+      .create({ data: { email, passwordHash: studentHash, firstName, lastName, role: Role.STUDENT, student: { create: profile } }, include: { student: true } })
+      .then((user) => user.student!);
 
-  const annaUser = await prisma.user.create({
-    data: { email: 'anna@uni.demo', passwordHash: studentHash, firstName: 'Anna', lastName: 'Petrova', role: Role.STUDENT,
-      student: { create: { facultyNumber: 'F12345', program: 'Software Engineering', year: 4 } } }
-  });
-  const borisUser = await prisma.user.create({
-    data: { email: 'boris@uni.demo', passwordHash: studentHash, firstName: 'Boris', lastName: 'Ivanov', role: Role.STUDENT,
-      student: { create: { facultyNumber: 'F12346', program: 'Software Engineering', year: 4 } } }
-  });
-  const additionalStudents = [
+  const anna = await createStudent('Анна', 'Петрова', 'anna@uni.demo', { facultyNumber: 'F12345', program: 'Софтуерно инженерство', year: 1, rfidUid: 'EA972406' });
+  const boris = await createStudent('Борис', 'Иванов', 'boris@uni.demo', { facultyNumber: 'F12346', program: 'Софтуерно инженерство', year: 1 });
+  const others = await Promise.all([
     ['Георги', 'Георгиев', 'georgi.georgiev', 'F12347'],
     ['Виктория', 'Димитрова', 'viktoria.dimitrova', 'F12348'],
     ['Николай', 'Николов', 'nikolay.nikolov', 'F12349'],
@@ -44,87 +36,72 @@ async function main() {
     ['Калоян', 'Василев', 'kaloyan.vasilev', 'F12357'],
     ['Ралица', 'Ганева', 'ralitsa.ganeva', 'F12358'],
     ['Стефан', 'Михайлов', 'stefan.mihaylov', 'F12359'],
-  ];
-  const additionalStudentUsers = await Promise.all(additionalStudents.map(([firstName, lastName, email, facultyNumber]) =>
-    prisma.user.create({
-      data: {
-        email: `${email}@uni.demo`, passwordHash: studentHash, firstName, lastName, role: Role.STUDENT,
-        student: { create: { facultyNumber, program: 'Софтуерно инженерство', year: 1 } },
-      },
+  ].map(([firstName, lastName, login, facultyNumber]) =>
+    createStudent(firstName, lastName, `${login}@uni.demo`, { facultyNumber, program: 'Софтуерно инженерство', year: 1 })));
+  const allStudents = [anna, boris, ...others];
+
+  const lecturer = await prisma.user
+    .create({
+      data: { email: 'lecturer@uni.demo', passwordHash: lecturerHash, firstName: 'Мария', lastName: 'Петрова', role: Role.LECTURER, lecturer: { create: { title: 'Проф. д-р' } } },
+      include: { lecturer: true },
     })
-  ));
-  const lecturerUser = await prisma.user.create({
-    data: { email: 'lecturer@uni.demo', passwordHash: lecturerHash, firstName: 'Elena', lastName: 'Ivanova', role: Role.LECTURER,
-      lecturer: { create: { title: 'Assoc. Prof.' } } }
-  });
+    .then((user) => user.lecturer!);
 
-  const anna = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: annaUser.id } });
-  const boris = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: borisUser.id } });
-  const additionalStudentProfiles = await Promise.all(additionalStudentUsers.map((student) =>
-    prisma.studentProfile.findUniqueOrThrow({ where: { userId: student.id } })
-  ));
-  const allStudents = [anna, boris, ...additionalStudentProfiles];
-  const lecturer = await prisma.lecturerProfile.findUniqueOrThrow({ where: { userId: lecturerUser.id } });
-
+  // Курс SA101 с всички студенти
   const course = await prisma.course.create({
     data: {
       code: 'SA101', name: 'Софтуерна архитектура', description: 'Архитектурни шаблони, слоеве, MVC/MVVM, услуги и компромиси.',
       lecturerId: lecturer.id, requiredSessions: 5,
-      badgeRules: { create: { name: 'Perfect Attendance', description: 'Attended all five required exercises.', benefit: 'One optional exam question may be skipped.', requiredPresent: 5 } }
-    }
+      badgeRules: { create: { name: 'Perfect Attendance', description: 'Attended all five required exercises.', benefit: 'One optional exam question may be skipped.', requiredPresent: 5 } },
+    },
   });
-  await prisma.enrollment.createMany({
-    data: [
-      { studentId: anna.id, courseId: course.id },
-      { studentId: boris.id, courseId: course.id },
-      ...additionalStudentProfiles.map((student) => ({ studentId: student.id, courseId: course.id })),
-    ],
-  });
+  await prisma.enrollment.createMany({ data: allStudents.map((student) => ({ studentId: student.id, courseId: course.id })) });
 
+  // 5 лекции по 90 мин: 3 минали (CLOSED) и 2 предстоящи (PLANNED) – днес след 1 час и след седмица
   const titles = ['Layered Architecture', 'MVC', 'MVVM', 'Repository Pattern', 'Microservices Basics'];
   const sessions = [];
   for (let i = 0; i < 5; i++) {
-    const start = i < 4 ? days(-28 + i * 7) : new Date(Date.now() + 60 * 60 * 1000);
-    const end = new Date(start.getTime() + 90 * 60 * 1000);
+    const startsAt = i < 3 ? days(-28 + i * 7) : i === 3 ? new Date(Date.now() + 60 * 60 * 1000) : days(7);
+    const status = i < 3 ? SessionStatus.CLOSED : SessionStatus.PLANNED;
     sessions.push(await prisma.classSession.create({
-      data: { courseId: course.id, title: titles[i], startsAt: start, endsAt: end, room: 'Lab 301', status: i < 4 ? SessionStatus.CLOSED : SessionStatus.PLANNED }
+      data: { courseId: course.id, title: titles[i], startsAt, endsAt: new Date(startsAt.getTime() + 90 * 60 * 1000), room: 'Lab 301', status },
     }));
   }
 
-  for (let i = 0; i < 4; i++) {
-    for (let studentIndex = 0; studentIndex < allStudents.length; studentIndex++) {
-      const student = allStudents[studentIndex];
-      const absent = student === boris ? i === 3 : studentIndex > 1 && (studentIndex + i) % 5 === 0;
+  // Присъствия за миналите лекции: Борис отсъства на MVVM, част от останалите – по формула
+  for (let i = 0; i < 3; i++) {
+    for (const [index, student] of allStudents.entries()) {
+      const absent = student === boris ? i === 2 : index > 1 && (index + i) % 5 === 0;
       await prisma.attendanceRecord.create({
-        data: {
-          studentId: student.id,
-          sessionId: sessions[i].id,
-          status: absent ? AttendanceStatus.ABSENT : AttendanceStatus.PRESENT,
-          checkedAt: absent ? null : sessions[i].startsAt,
-        },
+        data: { studentId: student.id, sessionId: sessions[i].id, status: absent ? AttendanceStatus.ABSENT : AttendanceStatus.PRESENT, checkedAt: absent ? null : sessions[i].startsAt },
       });
     }
   }
 
+  // Материали за лекции 4 и 5 (backend/uploads)
   const uploadDir = path.resolve(process.cwd(), 'uploads');
   fs.mkdirSync(uploadDir, { recursive: true });
-  const material4 = path.join(uploadDir, 'repository-pattern.md');
-  const material5 = path.join(uploadDir, 'microservices-basics.md');
-  fs.writeFileSync(material4, '# Repository Pattern\nThe Repository pattern separates domain logic from persistence details. A repository exposes collection-like operations while hiding database-specific queries. Benefits include testability and separation of concerns; drawbacks include unnecessary abstraction in very simple systems.');
-  fs.writeFileSync(material5, '# Microservices Basics\nA microservice architecture structures an application as independently deployable services around business capabilities. Each service owns its data and communicates through explicit APIs or messaging. Benefits include independent deployment and scaling. Costs include distributed-system complexity, observability, network failures, data consistency and operational overhead.');
-  await prisma.material.create({ data: { sessionId: sessions[3].id, title: 'Repository Pattern Notes', fileName: 'repository-pattern.md', mimeType: 'text/markdown', localPath: material4 } });
-  await prisma.material.create({ data: { sessionId: sessions[4].id, title: 'Microservices Basics Notes', fileName: 'microservices-basics.md', mimeType: 'text/markdown', localPath: material5 } });
+  const materials = [
+    { session: sessions[3], title: 'Repository Pattern Notes', fileName: 'repository-pattern.md', text: '# Repository Pattern\nThe Repository pattern separates domain logic from persistence details. A repository exposes collection-like operations while hiding database-specific queries. Benefits include testability and separation of concerns; drawbacks include unnecessary abstraction in very simple systems.' },
+    { session: sessions[4], title: 'Microservices Basics Notes', fileName: 'microservices-basics.md', text: '# Microservices Basics\nA microservice architecture structures an application as independently deployable services around business capabilities. Each service owns its data and communicates through explicit APIs or messaging. Benefits include independent deployment and scaling. Costs include distributed-system complexity, observability, network failures, data consistency and operational overhead.' },
+  ];
+  for (const material of materials) {
+    const localPath = path.join(uploadDir, material.fileName);
+    fs.writeFileSync(localPath, material.text);
+    await prisma.material.create({ data: { sessionId: material.session.id, title: material.title, fileName: material.fileName, mimeType: 'text/markdown', localPath } });
+  }
 
+  // Готов Smart Catch-up за Борис (MVVM)
   await prisma.catchupPackage.create({ data: {
-    studentId: boris.id, sessionId: sessions[3].id, title: 'Smart Catch-up: Repository Pattern',
-    summary: 'The Repository pattern separates domain logic from persistence. It gives the application a collection-like interface and hides database-specific details, which can improve testability and separation of concerns.',
-    keyConcepts: ['Repository abstraction', 'Persistence isolation', 'Testability', 'Separation of concerns'],
+    studentId: boris.id, sessionId: sessions[2].id, title: 'Smart Catch-up: MVVM',
+    summary: 'MVVM (Model–View–ViewModel) separates the user interface from the presentation logic. The View only displays data and binds to properties and commands of the ViewModel, while the Model holds the data and business rules. This makes the UI logic testable without the UI.',
+    keyConcepts: ['Model', 'View', 'ViewModel', 'Data binding'],
     quiz: [
-      { question: 'What does a Repository primarily hide?', options: ['Persistence details', 'UI colors', 'HTTP status codes', 'Passwords'], correctIndex: 0, explanation: 'It abstracts the data-access implementation.' },
-      { question: 'A common benefit is?', options: ['Testability', 'More coupling', 'No database', 'No domain model'], correctIndex: 0, explanation: 'Repositories can make domain code easier to test.' },
-      { question: 'Repository exposes an interface similar to?', options: ['A collection', 'A CSS file', 'A DNS server', 'A compiler'], correctIndex: 0, explanation: 'Collection-like methods are typical.' },
-      { question: 'Which concern is separated?', options: ['Domain and persistence', 'Keyboard and mouse', 'CPU and RAM', 'Email and calendar'], correctIndex: 0, explanation: 'The pattern separates domain logic from persistence details.' },
-      { question: 'Possible drawback?', options: ['Unnecessary abstraction', 'Guaranteed data loss', 'No testing', 'No API'], correctIndex: 0, explanation: 'Simple systems may not need the extra abstraction.' }
+      { question: 'What does the ViewModel contain?', options: ['Presentation logic and UI state', 'Only CSS styles', 'The database schema', 'Network drivers'], correctIndex: 0, explanation: 'The ViewModel exposes the data and commands that the View needs.' },
+      { question: 'How does the View usually get data from the ViewModel?', options: ['Data binding', 'Direct SQL queries', 'E-mail', 'Copying files'], correctIndex: 0, explanation: 'Bindings keep the View in sync with the ViewModel automatically.' },
+      { question: 'Which part holds the business data and rules?', options: ['Model', 'View', 'Router', 'Compiler'], correctIndex: 0, explanation: 'The Model represents the data and the business rules.' },
+      { question: 'A main benefit of MVVM is?', options: ['UI logic can be tested without the UI', 'No database is needed', 'A faster CPU', 'No code is needed'], correctIndex: 0, explanation: 'Logic in the ViewModel can be unit-tested without rendering the View.' },
+      { question: 'MVVM is most common in?', options: ['UI frameworks with data binding', 'Operating system kernels', 'Network routers', 'Compilers'], correctIndex: 0, explanation: 'MVVM relies on the binding support of UI frameworks.' }
     ]
   }});
 
@@ -132,7 +109,8 @@ async function main() {
   console.log('Student: anna@uni.demo / Student123!');
   console.log('Student: boris@uni.demo / Student123!');
   console.log('Lecturer: lecturer@uni.demo / Lecturer123!');
-  console.log(`Final demo session ID: ${sessions[4].id}`);
+  console.log(`Lecture 4 (Repository Pattern) session ID: ${sessions[3].id}`); // за --session на RFID моста
+  console.log(`Lecture 5 (Microservices Basics) session ID: ${sessions[4].id}`);
 }
 
 main().finally(() => prisma.$disconnect());

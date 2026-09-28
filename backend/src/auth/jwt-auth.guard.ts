@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
+// Проверява Bearer токена; payload-ът се записва в request.user
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(private jwt: JwtService, private config: ConfigService) {}

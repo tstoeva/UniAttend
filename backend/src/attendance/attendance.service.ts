@@ -1,56 +1,48 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { AttendanceStatus, SessionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { checkInAllowed } from '../common/policies';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private prisma: PrismaService, private jwt: JwtService, private config: ConfigService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async createStudentCredential(userId: string) {
-    const student = await this.prisma.studentProfile.findUnique({ where: { userId }, include: { user: true } });
-    if (!student) throw new NotFoundException('Student profile not found');
-    const credential = await this.jwt.signAsync(
-      { studentId: student.id, facultyNumber: student.facultyNumber, kind: 'student_credential' },
-      { secret: this.config.getOrThrow<string>('CREDENTIAL_SECRET'), expiresIn: '180d' },
-    );
-    return { credential, student: { name: `${student.user.firstName} ${student.user.lastName}`, facultyNumber: student.facultyNumber } };
-  }
+  async checkInByRfid(sessionId: string, rfidUid: string) {
+    // UID-ът се пази без двоеточия и с главни букви
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { rfidUid: rfidUid.replace(/:/g, '').toUpperCase() },
+      include: { user: true },
+    });
+    if (!student) throw new NotFoundException('RFID card is not registered');
 
-  async checkIn(sessionId: string, credential: string) {
-    let payload: any;
-    try {
-      payload = await this.jwt.verifyAsync(credential, { secret: this.config.getOrThrow<string>('CREDENTIAL_SECRET') });
-    } catch {
-      throw new BadRequestException('Invalid or expired student credential');
-    }
-    if (payload.kind !== 'student_credential') throw new BadRequestException('Invalid credential type');
-
-    const session = await this.prisma.classSession.findUnique({ where: { id: sessionId }, include: { course: true } });
+    const session = await this.prisma.classSession.findUnique({ where: { id: sessionId } });
     if (!session) throw new NotFoundException('Session not found');
-    if (session.status !== SessionStatus.OPEN) throw new BadRequestException('Session is not open for attendance');
 
     const enrollment = await this.prisma.enrollment.findUnique({
-      where: { studentId_courseId: { studentId: payload.studentId, courseId: session.courseId } },
+      where: { studentId_courseId: { studentId: student.id, courseId: session.courseId } },
     });
-    if (!enrollment) throw new BadRequestException('Student is not enrolled in this course');
+    if (!checkInAllowed(session.status, !!enrollment)) {
+      throw new BadRequestException(
+        session.status !== SessionStatus.OPEN ? 'Session is not open for attendance' : 'Student is not enrolled in this course',
+      );
+    }
 
+    // 15 минути толеранс след края на сесията
     const now = new Date();
     if (now > new Date(session.endsAt.getTime() + 15 * 60_000)) throw new BadRequestException('Check-in window has ended');
 
+    // upsert: повторно сканиране не създава дубликат
     const record = await this.prisma.attendanceRecord.upsert({
-      where: { studentId_sessionId: { studentId: payload.studentId, sessionId } },
-      create: { studentId: payload.studentId, sessionId, status: AttendanceStatus.PRESENT, checkedAt: now },
-      update: { status: AttendanceStatus.PRESENT, checkedAt: now },
-      include: { student: { include: { user: true } } },
+      where: { studentId_sessionId: { studentId: student.id, sessionId } },
+      create: { studentId: student.id, sessionId, status: AttendanceStatus.PRESENT, checkedAt: now, source: 'RFID' },
+      update: { status: AttendanceStatus.PRESENT, checkedAt: now, source: 'RFID' },
     });
     return {
       ok: true,
       status: record.status,
       checkedAt: record.checkedAt,
-      student: `${record.student.user.firstName} ${record.student.user.lastName}`,
-      facultyNumber: record.student.facultyNumber,
+      student: `${student.user.firstName} ${student.user.lastName}`,
+      facultyNumber: student.facultyNumber,
     };
   }
 }

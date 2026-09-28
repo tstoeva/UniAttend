@@ -2,64 +2,55 @@
 
 UniAttend AI is a university attendance platform with:
 
-- Student iOS app (SwiftUI)
-- Lecturer web portal (React/Vite)
+- Lecturer + student web portal (React/Vite)
 - NestJS REST backend
 - PostgreSQL + Prisma
-- Wallet pass integration (`.pkpass`) with QR fallback
-- Attendance check-in terminal (browser camera; optional Python/OpenCV terminal)
-- Smart Catch-up: AI summary + quiz from lecturer materials
-- Perfect Attendance badge with server-side verification code
+- **RFID attendance check-in** (ESP32 + RC522 reader) — the active, working check-in method
+- Smart Catch-up: AI summary + quiz from lecturer materials, generated automatically for absent students
+- Student iOS app (SwiftUI) — present in the repo but currently **not wired up** (see §10)
+- QR credential, Apple Wallet pass and attendance badges — **prototype / future-functionality only**, not currently issued automatically (see §11)
 
 ## 1. What is already implemented
 
-### Student
+### Student (web)
 - Login
-- Dashboard with courses and attendance
-- Student credential QR
-- Optional Apple Wallet pass download
-- Smart Catch-up list
-- Five-question catch-up quiz
-- Score submission
-- Attendance badges
+- Dashboard with enrolled courses and per-session attendance (real for course `SA101`, demo data for the other listed subjects)
+- Smart Catch-up list + five-question quiz + server-side scoring
+- "Card" tab — a visual-only student ID mockup (no live QR/Wallet data behind it)
 
-### Lecturer
+### Lecturer (web)
 - Login
-- Course/session dashboard
-- Open attendance session
-- Browser-camera QR scanner
-- Manual scanner fallback
-- Upload lecturer material
-- Close session
-- Automatic `ABSENT` creation for students who did not check in
-- Automatic Smart Catch-up generation for absent students
-- Automatic badge evaluation after required sessions
+- Course/session dashboard with attendance roster
+- Open a session (sets it `OPEN` for 90 minutes)
+- Close a session — this automatically:
+  - creates `ABSENT` records for enrolled students without a check-in
+  - generates a Smart Catch-up for each newly-absent student
+- Link to the RFID terminal status screen
 
-### AI
-- Uses OpenAI Responses API when `OPENAI_API_KEY` is configured
-- Uploads lecturer files with purpose `user_data`
-- Supplies those files as `input_file`
-- Uses strict JSON Schema output for summary/key concepts/quiz
-- Demo fallback works without an API key
+There is currently **no lecturer UI/endpoint to create a new session or upload materials** — sessions and materials come from the seed data (`backend/prisma/seed.ts`). Add a session directly via `prisma studio` or the seed script if you need more than the five seeded ones.
 
-### Apple Wallet
-- Server-side `.pkpass` generation
-- Signed QR student credential embedded in pass
-- PassKit add-to-Wallet flow in the iOS app
-- Safe fallback to in-app QR when Apple certificates are not configured
+### AI (Smart Catch-up)
+- Uses the OpenAI Responses API when `OPENAI_API_KEY` is configured
+- Uploads lecturer files with purpose `user_data`, supplies them as `input_file`
+- Uses strict JSON Schema output for summary/key concepts/quiz (exactly 5 questions)
+- Deterministic demo fallback works with no API key, so the demo never depends on an external service
+
+### Prototype / not currently active
+- **QR credential & Apple Wallet pass** — the backend module for this was removed; the web "Card" tab and the `wallet/` folder are kept only as a visual mock-up / future-direction reference.
+- **Attendance badges** — the `BadgeRule`/`StudentBadge` data model and the student-facing read endpoints still exist, but closing a session no longer evaluates or issues a badge automatically. Nothing will populate this in a fresh demo run.
+- **iOS app** — still present under `ios/`, but its credential/Wallet screens call backend endpoints that no longer exist. Not part of the current demo (see §10).
 
 ## 2. Architecture
 
 ```text
-SwiftUI iOS App ─────────────┐
-                             │
-React Lecturer Portal ───────┼──> NestJS REST API ───> PostgreSQL
-                             │          │
-Browser/Pi QR Terminal ──────┘          ├──> OpenAI Responses API
-                                        └──> Apple Wallet pass generator
+ESP32 + RC522 reader --USB serial--> rfid_terminal.py (bridge, on a PC) --HTTP--> NestJS REST API ───> PostgreSQL
+                                                                                        │
+React web portal (student + lecturer) ------------------------HTTP--------------------┤
+                                                                                        │
+                                                                                  OpenAI Responses API
 ```
 
-The backend is the source of truth. The Wallet card and QR are only credentials; attendance, badges and exam benefits are always verified server-side.
+The backend is the source of truth. Attendance is recorded only from a verified RFID scan and is always decided server-side.
 
 ## 3. Requirements
 
@@ -69,19 +60,14 @@ The backend is the source of truth. The Wallet card and QR are only credentials;
 - Docker Desktop
 - Git
 
-### For native iOS
-- macOS
-- Xcode
-- iOS 17+ target
-- optional: XcodeGen (`brew install xcodegen`)
+### For the RFID terminal
+- An ESP32 dev board + MFRC522 (RC522) reader module, wired over SPI
+- [PlatformIO](https://platformio.org/) (CLI or VS Code extension) to build/flash `esp32-rfid-terminal/`
+- A PC connected to the ESP32 over USB, with Python 3 + `pyserial` + `requests` to run the bridge script
+- At least one RFID card/tag registered to a student's `rfidUid` (Anna's demo card is seeded as `EA:97:24:06`)
 
-### For real Apple Wallet `.pkpass`
-- Apple Developer Program account
-- Pass Type ID
-- Pass Type certificate
-- Apple WWDR certificate
-
-Without these Apple credentials the application still works with the in-app QR credential.
+### For the (currently unused) iOS app
+- macOS, Xcode, iOS 17+ target, optional XcodeGen — see the caveat in §10 before investing time here.
 
 ## 4. Fast start on Windows
 
@@ -171,53 +157,46 @@ Lecturer123!
 
 ### A. Student preparation
 1. Sign in as Anna.
-2. Open `Student credential`.
-3. Anna initially has four `PRESENT` records in `Software Architecture`.
-4. The fifth session, `Microservices Basics`, is planned.
+2. Open the `Присъствия` (Attendance) tab.
+3. Anna already has four `PRESENT` sessions in `Софтуерна архитектура` (course `SA101`).
+4. The fifth session, `Microservices Basics`, is `PLANNED`.
 
 ### B. Lecturer opens the final session
 1. Sign out.
 2. Sign in as `lecturer@uni.demo`.
 3. Find `Microservices Basics`.
-4. Click `Open attendance`.
-5. Click `Open scanner`.
+4. Click `Отвори присъствия` (Open attendance).
+5. Click `Отвори скенер` (Open scanner) — this just links to the RFID terminal status page; the actual scan happens on the ESP32 hardware.
 
-### C. Attendance
-Use a second browser/device for Anna's QR.
+### C. Attendance (RFID)
+Run the active RFID bridge with the ESP32 reader connected over USB:
 
-Scan Anna's credential in the lecturer terminal.
+```powershell
+pip install pyserial requests
+python terminal/rfid_terminal.py --port COM8 --api http://localhost:3000/api --session SESSION_ID --token LECTURER_JWT
+```
 
-Expected result:
+Present Anna's RFID card (`EA:97:24:06`) to the reader.
+
+Expected console output:
 
 ```text
-Anna Petrova (F12345) checked in
+CHECKED IN: Anna Petrova (F12345) [EA972406]
 ```
 
 ### D. Close the session
-Return to lecturer dashboard and press `Close session`.
+Return to the lecturer dashboard and press `Затвори сесия` (Close session).
 
 The backend:
 1. Changes the session to `CLOSED`.
 2. Keeps Anna as `PRESENT`.
-3. Creates `ABSENT` for Boris if he did not check in.
-4. Generates a Smart Catch-up for Boris.
-5. Counts Anna's attendance.
-6. Because Anna is now 5/5, issues `Perfect Attendance`.
+3. Creates `ABSENT` for Boris (and anyone else who did not scan).
+4. Generates a Smart Catch-up for each newly-absent student.
+
+Badges are **not** issued automatically at this point — that logic was removed from the MVP scope (see §1).
 
 ### E. Show the result
-Sign in as Anna again.
-
-You should see:
-
-```text
-Software Architecture
-5 / 5
-
-Perfect Attendance ✓
-Benefit: One optional exam question may be skipped.
-```
-
-Sign in as Boris to show the new Smart Catch-up for `Microservices Basics`.
+Sign in as Boris to show his new Smart Catch-up for `Microservices Basics`, including the five-question quiz and server-side score.
 
 ## 8. Enable real OpenAI Smart Catch-up
 
@@ -230,7 +209,7 @@ OPENAI_MODEL="gpt-5.6"
 
 Restart backend.
 
-Lecturer materials are saved locally. On catch-up generation, the backend uploads them to the OpenAI Files API and sends the resulting file IDs as `input_file` content to the Responses API.
+Lecturer materials are saved locally (seeded under `backend/uploads/`). On catch-up generation, the backend uploads them to the OpenAI Files API and sends the resulting file IDs as `input_file` content to the Responses API.
 
 The output is constrained to:
 
@@ -254,128 +233,43 @@ Exactly five quiz questions are requested.
 
 If no API key exists, a deterministic demo catch-up is generated so the diploma demo never depends on an external service.
 
-## 9. iOS setup
+## 9. RFID hardware terminal (ESP32 + RC522)
 
-### Option A — XcodeGen
+This is the active attendance check-in method — not optional polish.
 
-On a Mac:
-
+### 9.1 Flash the ESP32
 ```bash
-brew install xcodegen
-cd ios
-xcodegen generate
-open UniAttendAI.xcodeproj
+cd esp32-rfid-terminal
+pio run --target upload
+pio device monitor
 ```
+(`pio` = PlatformIO CLI; the VS Code PlatformIO extension can do the same from the UI.) The firmware (`src/main.cpp`) initializes the RC522 over SPI and, whenever a card is presented, prints its UID over USB serial as `UID: XX:XX:XX:XX`. It has no WiFi/HTTP logic — it only talks over the USB cable.
 
-Run on an iOS Simulator.
-
-For the simulator, the default API URL is:
-
-```text
-http://localhost:3000/api
-```
-
-For a physical iPhone, edit:
-
-```text
-ios/UniAttendAI/Services/APIClient.swift
-```
-
-Replace:
-
-```swift
-http://localhost:3000/api
-```
-
-with the LAN address of the computer running the backend, for example:
-
-```swift
-http://192.168.1.20:3000/api
-```
-
-The iPhone and development machine must be on the same network.
-
-### Option B — Create the Xcode project manually
-1. Xcode → New Project → iOS App.
-2. Product name: `UniAttendAI`.
-3. Interface: SwiftUI.
-4. Language: Swift.
-5. Delete the generated Swift files except project metadata.
-6. Drag the complete `ios/UniAttendAI` directory into the target.
-7. Run.
-
-## 10. Configure Apple Wallet signing
-
-Create a Pass Type Identifier in Apple Developer, for example:
-
-```text
-pass.com.yourname.uniattend
-```
-
-Create/download its certificate and export it with the private key as `.p12`.
-
-Create PEM files. Exact OpenSSL options can differ by OpenSSL version; a common workflow is:
-
-```bash
-openssl pkcs12 -in pass.p12 -clcerts -nokeys -out signerCert.pem
-openssl pkcs12 -in pass.p12 -nocerts -out signerKey.pem
-```
-
-Download the current Apple WWDR intermediate certificate and convert it if necessary to PEM.
-
-Place only local copies here:
-
-```text
-wallet/certs/wwdr.pem
-wallet/certs/signerCert.pem
-wallet/certs/signerKey.pem
-```
-
-Never commit the private key.
-
-Edit `backend/.env`:
-
-```env
-APPLE_PASS_TYPE_IDENTIFIER="pass.com.yourname.uniattend"
-APPLE_TEAM_IDENTIFIER="YOUR_TEAM_ID"
-APPLE_ORGANIZATION_NAME="Your University"
-APPLE_WWDR_CERT_PATH="../wallet/certs/wwdr.pem"
-APPLE_SIGNER_CERT_PATH="../wallet/certs/signerCert.pem"
-APPLE_SIGNER_KEY_PATH="../wallet/certs/signerKey.pem"
-APPLE_SIGNER_KEY_PASSPHRASE="YOUR_KEY_PASSPHRASE_IF_USED"
-```
-
-Restart backend.
-
-The iOS `Student Card` screen will then enable `Add to Apple Wallet`.
-
-### Important design limitation
-
-The MVP Wallet pass uses a QR barcode because this is demonstrable without Apple's special NFC-pass entitlement. NFC-enabled Wallet passes require additional Apple authorization. The backend intentionally treats the credential transport as replaceable: QR can later be replaced by an approved NFC/Student ID flow without changing attendance, AI or badge logic.
-
-## 11. Optional Raspberry Pi / physical terminal
-
-A laptop webcam is sufficient for the diploma demo. For a more physical prototype:
+### 9.2 Run the bridge script
+On a PC connected to the ESP32 over USB:
 
 ```bash
 cd terminal
-pip install opencv-python requests
-python qr_terminal.py \
-  --api http://192.168.1.20:3000/api \
-  --session YOUR_SESSION_ID \
-  --token YOUR_LECTURER_JWT
+pip install pyserial requests
+python rfid_terminal.py --port COM8 --api http://localhost:3000/api --session SESSION_ID --token LECTURER_JWT
 ```
 
-Use a Raspberry Pi 4/5 + USB camera or Pi Camera.
+The script reads UID lines from the serial port, de-duplicates repeated scans within 3 seconds, and POSTs `{sessionId, rfidUid}` to `POST /attendance/rfid-check-in` using the lecturer's JWT.
 
-For an even more polished physical setup add:
-- 5–7 inch display
-- Raspberry Pi case / 3D-printed stand
-- green/red LED
-- buzzer
-- printed `UniAttend AI Attendance Terminal` label
+### 9.3 Register a student's card
+A student's `StudentProfile.rfidUid` must be set before their card will be recognized (`NotFoundException: RFID card is not registered` otherwise). Anna's demo card (`EA972406`) is pre-registered by the seed script and by migration `20260926120000_add_rfid_uid`. To register another card, update `StudentProfile.rfidUid` for that student (e.g. via `npx prisma studio`).
 
-Do **not** design the MVP around RC522 reading an Apple Wallet pass. Standard low-cost RFID readers do not provide the same Apple Wallet NFC redemption protocol.
+## 10. iOS app — known status
+
+The SwiftUI project under `ios/` still exists but is currently **out of sync with the backend**: its credential (`GET /attendance/credential`) and Wallet screens call endpoints that were removed along with the Wallet module. Building and running it as-is will fail on those screens. It is not part of the current demo plan. If you want to revive it later, either point it at the RFID flow (there is currently no student-facing RFID enrollment API) or restore the QR credential endpoint in `attendance.controller.ts`/`attendance.service.ts`.
+
+## 11. Apple Wallet & QR credential — removed from MVP scope
+
+The Apple Wallet pass generator (`backend/src/wallet/`) and the JWT-based QR credential (`GET /attendance/credential`, `POST /attendance/check-in`) have been deleted from the backend. Only static leftovers remain on disk:
+- `wallet/UniAttend.pass/`, `wallet/assets/`, `wallet/certs/` — the old pass template/assets, unused by any code now.
+- The web "Card" tab shows a purely visual student-ID mock-up with a disabled "Apple Wallet · future functionality" button.
+
+This is intentional, current project scope — not a bug. If you want it back, the pattern to follow is the same one used to restore the AI module: recover the deleted files from git history (`git log -- backend/src/wallet`), re-import `WalletModule` in `app.module.ts`, and re-wire `AttendanceModule`'s export the way `WalletService` originally consumed it.
 
 ## 12. Database entities
 
@@ -383,12 +277,12 @@ Core entities:
 
 ```text
 User
-StudentProfile
+StudentProfile   (now includes a unique, nullable rfidUid)
 LecturerProfile
 Course
 Enrollment
 ClassSession
-AttendanceRecord
+AttendanceRecord (source defaults to "WALLET_QR"; RFID scans are recorded with source: "RFID")
 Material
 CatchupPackage
 BadgeRule
@@ -399,35 +293,31 @@ Important constraints:
 - one enrollment per student/course
 - one attendance record per student/session
 - one catch-up package per absent student/session
-- one issued badge per student/rule
+- one issued badge per student/rule (enforced at the DB level; nothing currently writes new rows here)
 - unique badge verification code
+- unique `rfidUid` per student
 
 ## 13. Security rules implemented
 
 - Password hashing with bcrypt
-- JWT authentication
+- JWT authentication for login sessions
 - Role guards for STUDENT / LECTURER / ADMIN
-- Signed student credential token
-- Check-in only while session status is `OPEN`
+- RFID check-in requires a valid lecturer JWT, an `OPEN` session, and an enrolled student — verified server-side, never trusted from the terminal script
+- Check-in only while session status is `OPEN` (plus a 15-minute grace window after `endsAt`)
 - Enrollment validation during check-in
-- Server-side badge evaluation
 - Server-side quiz scoring
-- Apple private keys excluded by `.gitignore`
 
 ### Recommended next hardening before production
 
 For the diploma, discuss these as future work:
-- short-lived rotating attendance credentials
-- device binding / App Attest
-- HTTPS everywhere
-- refresh tokens
 - login rate limiting
 - audit log entity
 - object storage instead of local uploads
 - malware scanning for lecturer uploads
 - GDPR retention policies
 - university SSO / OAuth2 / SAML
-- Apple-approved NFC Student ID integration
+- HTTPS everywhere
+- restoring and hardening the Wallet/QR credential path if pursued further
 
 ## 14. Functional test checklist
 
@@ -439,31 +329,24 @@ For the diploma, discuss these as future work:
 
 ### Attendance
 - [ ] Lecturer can open a session
-- [ ] Student credential scans successfully
+- [ ] A registered RFID card checks in successfully
+- [ ] An unregistered RFID UID is rejected (`RFID card is not registered`)
 - [ ] Non-enrolled student is rejected
 - [ ] Closed session rejects check-in
-- [ ] Duplicate scan does not create duplicate attendance rows
+- [ ] Duplicate scan within a few seconds does not create duplicate attendance rows
 - [ ] Closing marks missing students absent
 
 ### Smart Catch-up
-- [ ] Material upload works
-- [ ] Absent student receives catch-up
-- [ ] Present student does not receive catch-up for that session
+- [ ] Absent student receives a catch-up automatically when the session is closed
+- [ ] Present student does not receive a catch-up for that session
 - [ ] Quiz has five questions
 - [ ] Quiz is scored server-side
 - [ ] Catch-up does not convert `ABSENT` to `PRESENT`
 
-### Badge
-- [ ] 4/5 does not issue perfect-attendance badge
-- [ ] 5/5 issues badge
-- [ ] Badge has unique verification code
-- [ ] Badge benefit comes from `BadgeRule`, not hard-coded UI
-
-### Wallet
-- [ ] QR fallback works without certificates
-- [ ] Wallet status shows unavailable without certs
-- [ ] Signed `.pkpass` downloads when certs are configured
-- [ ] iOS presents Apple's add-pass controller
+### Not currently exercised (feature removed/inactive)
+- Badge issuance and verification
+- Apple Wallet pass download
+- iOS app end-to-end flow
 
 ## 15. Suggested Git history
 
@@ -483,13 +366,12 @@ Do not commit the entire diploma as one commit. A believable engineering history
 11 add attendance badge rules
 12 add Apple Wallet pass generator
 13 add SwiftUI student app
-14 add validation and error handling
-15 add tests and documentation
+14 replace QR/Wallet credential with ESP32 + RFID hardware terminal
+15 add validation and error handling
+16 add tests and documentation
 ```
 
 ## 16. Recommended project completion order
-
-Follow this order exactly:
 
 ### Phase 1 — Local backend
 - run DB
@@ -498,48 +380,32 @@ Follow this order exactly:
 - verify login endpoints
 
 ### Phase 2 — Attendance
-- open final session
-- scan Anna
-- close session
-- confirm 5/5 badge
+- flash and run the ESP32 RFID terminal
+- open the final session
+- scan Anna's card
+- close the session
+- confirm Boris gets marked absent and receives a Smart Catch-up
 
 ### Phase 3 — AI
-- add API key
-- upload a PDF/notes document
-- miss a session with Boris
-- verify grounded catch-up
+- add an API key
+- verify a grounded catch-up is generated instead of the demo fallback
 
-### Phase 4 — iOS
-- generate/open Xcode project
-- connect to backend
-- verify login/dashboard/QR
-
-### Phase 5 — Wallet
-- create Apple Pass Type ID/certificate
-- configure backend PEM files
-- add generated pass to real iPhone
-
-### Phase 6 — Physical polish
-- run terminal on laptop or Pi
-- add branded enclosure/screen
-
-### Phase 7 — Testing
+### Phase 4 — Testing
 - execute the checklist above
 - capture screenshots
-- record expected/actual results in thesis
+- record expected/actual results in the thesis
 
-### Phase 8 — Deployment
+### Phase 5 — Deployment
 - PostgreSQL: managed DB
 - backend: Render/Railway/Azure/AWS or university server
 - web: Vercel/Netlify/static host
 - use HTTPS
-- update iOS API URL
 
-### Phase 9 — Diploma writing
-Write the implementation chapter only after the MVP is stable so screenshots and diagrams match the actual code.
+### Phase 6 — Diploma writing
+Write the implementation chapter only after the MVP is stable so screenshots and diagrams match the actual code — including the fact that QR/Wallet/badges are documented as a deliberate, discussed scope reduction rather than missing work.
 
-### Phase 10 — Defense rehearsal
-Practice the seven-minute flow from `docs/DEFENSE_DEMO.md`.
+### Phase 7 — Defense rehearsal
+Practice the flow from `docs/DEFENSE_DEMO.md`, updated to the RFID-based demo in §7 above.
 
 ## 17. What not to overbuild
 
@@ -548,13 +414,13 @@ For a bachelor diploma, do not spend most of the time on:
 - real grade management
 - payment functions
 - complicated social features
-- real Apple NFC entitlement approval
+- reviving the iOS app or Apple Wallet unless there's time left over
 - custom machine-learning model training
 
-The strongest scope is:
+The current strongest scope is:
 
 ```text
-Attendance + Wallet identity + absence detection + grounded AI catch-up + verifiable attendance badge
+RFID hardware attendance + absence detection + grounded AI catch-up
 ```
 
 That is one coherent software-engineering problem and is large enough for a bachelor diploma.

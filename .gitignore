@@ -10,3 +10,4 @@ ios/*.xcodeproj
 ios/*.xcworkspace
 wallet/certs/*
 !wallet/certs/.gitkeep
+.pio/

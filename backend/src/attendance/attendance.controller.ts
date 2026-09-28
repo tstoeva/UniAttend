@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { AttendanceService } from './attendance.service';
-import { CheckInDto } from './dto';
+import { RfidCheckInDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 
@@ -10,11 +10,10 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 export class AttendanceController {
   constructor(private attendance: AttendanceService) {}
 
-  @Get('credential')
-  @Roles(Role.STUDENT)
-  credential(@Req() req: any) { return this.attendance.createStudentCredential(req.user.sub); }
-
-  @Post('check-in')
+  // Извиква се от RFID моста (terminal/rfid_terminal.py)
+  @Post('rfid-check-in')
   @Roles(Role.LECTURER)
-  checkIn(@Body() dto: CheckInDto) { return this.attendance.checkIn(dto.sessionId, dto.credential); }
+  rfidCheckIn(@Body() dto: RfidCheckInDto) {
+    return this.attendance.checkInByRfid(dto.sessionId, dto.rfidUid);
+  }
 }

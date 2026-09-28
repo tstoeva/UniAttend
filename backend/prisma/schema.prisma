@@ -7,18 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ADMIN засега не се използва
 enum Role {
   STUDENT
   LECTURER
   ADMIN
 }
 
+// PLANNED (предстои) → OPEN (чекиране с RFID) → CLOSED (отсъстващите стават ABSENT)
 enum SessionStatus {
   PLANNED
   OPEN
   CLOSED
 }
 
+// Използват се PRESENT и ABSENT; LATE и EXCUSED са резерв за бъдеще
 enum AttendanceStatus {
   PRESENT
   ABSENT
@@ -43,12 +46,14 @@ model User {
   lecturer     LecturerProfile?
 }
 
+// rfidUid: UID на RFID картата без двоеточия (напр. EA972406); walletSerial: Apple Wallet (изключено)
 model StudentProfile {
   id             String              @id @default(cuid())
   userId         String              @unique
   facultyNumber  String              @unique
   program        String
   year           Int
+  rfidUid        String?             @unique
   walletSerial   String              @unique @default(cuid())
   user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   enrollments    Enrollment[]
@@ -65,6 +70,7 @@ model LecturerProfile {
   courses  Course[]
 }
 
+// requiredSessions и badgeRules са за значките
 model Course {
   id           String          @id @default(cuid())
   code         String          @unique
@@ -102,6 +108,7 @@ model ClassSession {
   catchups    CatchupPackage[]
 }
 
+// source: RFID при сканиране; WALLET_QR е от старата версия
 model AttendanceRecord {
   id         String           @id @default(cuid())
   studentId  String
@@ -114,6 +121,7 @@ model AttendanceRecord {
   @@unique([studentId, sessionId])
 }
 
+// Материали за AI резюмето; openaiFileId – файлът, вече качен в OpenAI
 model Material {
   id          String       @id @default(cuid())
   sessionId   String
@@ -126,6 +134,7 @@ model Material {
   session     ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
+// Smart Catch-up за отсъствал студент
 model CatchupPackage {
   id          String         @id @default(cuid())
   studentId   String
@@ -144,6 +153,7 @@ model CatchupPackage {
   @@unique([studentId, sessionId])
 }
 
+// Значки за пълно присъствие (в момента не се раздават)
 model BadgeRule {
   id          String  @id @default(cuid())
   courseId    String
