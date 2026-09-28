@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 export class JwtAuthGuard implements CanActivate {
   constructor(private jwt: JwtService, private config: ConfigService) {}
 
+  // Връща 401 при липсващ или невалиден токен
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
     const auth = request.headers.authorization as string | undefined;

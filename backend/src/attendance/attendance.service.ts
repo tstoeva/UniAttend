@@ -3,21 +3,25 @@ import { AttendanceStatus, SessionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { checkInAllowed } from '../common/policies';
 
+// Логика за отбелязване на присъствие
 @Injectable()
 export class AttendanceService {
   constructor(private prisma: PrismaService) {}
 
+  // Отбелязва студента като присъстващ по UID на картата
   async checkInByRfid(sessionId: string, rfidUid: string) {
-    // UID-ът се пази без двоеточия и с главни букви
+    // Намира студента по UID (пази се без двоеточия, с главни букви)
     const student = await this.prisma.studentProfile.findUnique({
       where: { rfidUid: rfidUid.replace(/:/g, '').toUpperCase() },
       include: { user: true },
     });
     if (!student) throw new NotFoundException('RFID card is not registered');
 
+    // Проверява, че сесията съществува
     const session = await this.prisma.classSession.findUnique({ where: { id: sessionId } });
     if (!session) throw new NotFoundException('Session not found');
 
+    // Сесията трябва да е отворена, а студентът – записан в курса
     const enrollment = await this.prisma.enrollment.findUnique({
       where: { studentId_courseId: { studentId: student.id, courseId: session.courseId } },
     });
@@ -31,12 +35,13 @@ export class AttendanceService {
     const now = new Date();
     if (now > new Date(session.endsAt.getTime() + 15 * 60_000)) throw new BadRequestException('Check-in window has ended');
 
-    // upsert: повторно сканиране не създава дубликат
+    // Записва присъствието (upsert – повторно сканиране не създава дубликат)
     const record = await this.prisma.attendanceRecord.upsert({
       where: { studentId_sessionId: { studentId: student.id, sessionId } },
       create: { studentId: student.id, sessionId, status: AttendanceStatus.PRESENT, checkedAt: now, source: 'RFID' },
       update: { status: AttendanceStatus.PRESENT, checkedAt: now, source: 'RFID' },
     });
+    // Отговор към RFID моста
     return {
       ok: true,
       status: record.status,

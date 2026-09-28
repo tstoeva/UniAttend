@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Логика за студентския портал
 @Injectable()
 export class StudentService {
   constructor(private prisma: PrismaService) {}
 
+  // Студентският профил на текущия потребител (с име)
   private async profile(userId: string) {
     const student = await this.prisma.studentProfile.findUnique({
       where: { userId },
@@ -14,8 +16,10 @@ export class StudentService {
     return student;
   }
 
+  // Данни за студентския портал
   async dashboard(userId: string) {
     const student = await this.profile(userId);
+    // Курсовете на студента с лектора и лекциите (с неговите присъствия)
     const enrollments = await this.prisma.enrollment.findMany({
       where: { studentId: student.id },
       include: {
@@ -27,11 +31,13 @@ export class StudentService {
         },
       },
     });
+    // Smart Catch-up пакетите, най-новите първи
     const catchups = await this.prisma.catchupPackage.findMany({
       where: { studentId: student.id },
       include: { session: { include: { course: true } } },
       orderBy: { createdAt: 'desc' },
     });
+    // Значките на студента
     const badges = await this.prisma.studentBadge.findMany({
       where: { studentId: student.id },
       include: { badgeRule: { include: { course: true } } },
@@ -40,6 +46,7 @@ export class StudentService {
     return { student, courses: enrollments.map((e) => e.course), catchups, badges };
   }
 
+  // Оценява теста: брои верните отговори и записва резултата
   async submitCatchup(userId: string, id: string, answers: number[]) {
     const student = await this.profile(userId);
     const item = await this.prisma.catchupPackage.findFirst({ where: { id, studentId: student.id } });

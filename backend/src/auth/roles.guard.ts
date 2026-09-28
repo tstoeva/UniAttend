@@ -2,9 +2,11 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, SetMetad
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
 
+// Декоратор @Roles(...) – кои роли имат достъп
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 
+// Пропуска заявката само ако ролята от токена е разрешена (иначе 403)
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}

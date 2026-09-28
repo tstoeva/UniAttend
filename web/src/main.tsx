@@ -13,6 +13,7 @@ function Guard({ role, children }: { role: string; children: React.ReactNode }) 
   return user?.role === role ? <>{children}</> : <Navigate to="/" />;
 }
 
+// Маршрути: вход, студент, лектор и RFID страница
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>

@@ -1,3 +1,4 @@
+// Prisma клиент и връзка с PostgreSQL (DATABASE_URL от .env)
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,7 +8,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ADMIN засега не се използва
+// Роли на потребителите (ADMIN засега не се използва)
 enum Role {
   STUDENT
   LECTURER
@@ -29,11 +30,13 @@ enum AttendanceStatus {
   EXCUSED
 }
 
+// Статус на Smart Catch-up пакет
 enum CatchupStatus {
   READY
   COMPLETED
 }
 
+// Потребители (студенти и лектори); паролата се пази като bcrypt хеш
 model User {
   id           String          @id @default(cuid())
   email        String          @unique
@@ -46,6 +49,7 @@ model User {
   lecturer     LecturerProfile?
 }
 
+// Студентски профил
 // rfidUid: UID на RFID картата без двоеточия (напр. EA972406); walletSerial: Apple Wallet (изключено)
 model StudentProfile {
   id             String              @id @default(cuid())
@@ -62,6 +66,7 @@ model StudentProfile {
   badges         StudentBadge[]
 }
 
+// Лекторски профил
 model LecturerProfile {
   id       String   @id @default(cuid())
   userId   String   @unique
@@ -70,6 +75,7 @@ model LecturerProfile {
   courses  Course[]
 }
 
+// Учебни дисциплини
 // requiredSessions и badgeRules са за значките
 model Course {
   id           String          @id @default(cuid())
@@ -84,6 +90,7 @@ model Course {
   badgeRules   BadgeRule[]
 }
 
+// Записани студенти по курсове
 model Enrollment {
   id        String         @id @default(cuid())
   studentId String
@@ -93,10 +100,12 @@ model Enrollment {
   @@unique([studentId, courseId])
 }
 
+// Лекции на курса и техният статус
 model ClassSession {
   id          String              @id @default(cuid())
   courseId    String
   title       String
+  syllabus    String?             // описание на темата от конспекта (използва се от AI)
   startsAt    DateTime
   endsAt      DateTime
   room        String
@@ -108,6 +117,7 @@ model ClassSession {
   catchups    CatchupPackage[]
 }
 
+// Присъствия – по един запис на студент за лекция
 // source: RFID при сканиране; WALLET_QR е от старата версия
 model AttendanceRecord {
   id         String           @id @default(cuid())
@@ -165,6 +175,7 @@ model BadgeRule {
   badges      StudentBadge[]
 }
 
+// Издадени значки
 model StudentBadge {
   id               String         @id @default(cuid())
   studentId        String

@@ -8,6 +8,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { AppController } from './app.controller';
 // import { WalletModule } from './wallet/wallet.module'; // Apple Wallet (изключено)
 
+// Главен модул – свързва конфигурацията, базата и модулите на приложението
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),

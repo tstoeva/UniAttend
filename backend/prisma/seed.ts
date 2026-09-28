@@ -1,12 +1,20 @@
 // Демо данни (npm run prisma:seed). Изтрива всички съществуващи данни.
 import { PrismaClient, Role, SessionStatus, AttendanceStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { ConfigService } from '@nestjs/config';
 import fs from 'fs';
 import path from 'path';
+import { AiService } from '../src/ai/ai.service';
+import { PrismaService } from '../src/prisma/prisma.service';
+
+// Ключът за OpenAI е в .env (нужен за Smart Catch-up на Анна)
+if (fs.existsSync('.env')) process.loadEnvFile();
 
 const prisma = new PrismaClient();
+// Дата след n дни (отрицателно число – в миналото)
 const days = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
 
+// Създава всички демо данни
 async function main() {
   // Останалите таблици се изтриват каскадно
   await prisma.course.deleteMany();
@@ -15,6 +23,7 @@ async function main() {
   // Потребители
   const studentHash = await bcrypt.hash('Student123!', 10);
   const lecturerHash = await bcrypt.hash('Lecturer123!', 10);
+  // Създава потребител със студентски профил и връща профила
   const createStudent = (firstName: string, lastName: string, email: string, profile: { facultyNumber: string; program: string; year: number; rfidUid?: string }) =>
     prisma.user
       .create({ data: { email, passwordHash: studentHash, firstName, lastName, role: Role.STUDENT, student: { create: profile } }, include: { student: true } })
@@ -22,6 +31,7 @@ async function main() {
 
   const anna = await createStudent('Анна', 'Петрова', 'anna@uni.demo', { facultyNumber: 'F12345', program: 'Софтуерно инженерство', year: 1, rfidUid: 'EA972406' });
   const boris = await createStudent('Борис', 'Иванов', 'boris@uni.demo', { facultyNumber: 'F12346', program: 'Софтуерно инженерство', year: 1 });
+  // Останалите студенти от курса
   const others = await Promise.all([
     ['Георги', 'Георгиев', 'georgi.georgiev', 'F12347'],
     ['Виктория', 'Димитрова', 'viktoria.dimitrova', 'F12348'],
@@ -40,6 +50,7 @@ async function main() {
     createStudent(firstName, lastName, `${login}@uni.demo`, { facultyNumber, program: 'Софтуерно инженерство', year: 1 })));
   const allStudents = [anna, boris, ...others];
 
+  // Лектор на SA101
   const lecturer = await prisma.user
     .create({
       data: { email: 'lecturer@uni.demo', passwordHash: lecturerHash, firstName: 'Мария', lastName: 'Петрова', role: Role.LECTURER, lecturer: { create: { title: 'Проф. д-р' } } },
@@ -59,29 +70,40 @@ async function main() {
 
   // 5 лекции по 90 мин: 3 минали (CLOSED) и 2 предстоящи (PLANNED) – днес след 1 час и след седмица
   const titles = ['Layered Architecture', 'MVC', 'MVVM', 'Repository Pattern', 'Microservices Basics'];
+  // Описание на темата MVC от конспекта (ползва се от AI и от резервния пакет)
+  const mvcOutline = [
+    '- Model: данните и бизнес правилата',
+    '- View: показва данните на потребителя',
+    '- Controller: обработва действията на потребителя',
+    '- Разделяне на отговорностите и по-лесно тестване',
+  ].join('\n');
   const sessions = [];
   for (let i = 0; i < 5; i++) {
     const startsAt = i < 3 ? days(-28 + i * 7) : i === 3 ? new Date(Date.now() + 60 * 60 * 1000) : days(7);
     const status = i < 3 ? SessionStatus.CLOSED : SessionStatus.PLANNED;
+    const syllabus = i === 1 ? mvcOutline : null;
     sessions.push(await prisma.classSession.create({
-      data: { courseId: course.id, title: titles[i], startsAt, endsAt: new Date(startsAt.getTime() + 90 * 60 * 1000), room: 'Lab 301', status },
+      data: { courseId: course.id, title: titles[i], syllabus, startsAt, endsAt: new Date(startsAt.getTime() + 90 * 60 * 1000), room: 'Lab 301', status },
     }));
   }
 
-  // Присъствия за миналите лекции: Борис отсъства на MVVM, част от останалите – по формула
+  // Присъствия за миналите лекции: Анна отсъства на MVC, Борис на MVVM, част от останалите – по формула
   for (let i = 0; i < 3; i++) {
     for (const [index, student] of allStudents.entries()) {
-      const absent = student === boris ? i === 2 : index > 1 && (index + i) % 5 === 0;
+      let absent = index > 1 && (index + i) % 5 === 0;
+      if (student === anna) absent = i === 1;
+      if (student === boris) absent = i === 2;
       await prisma.attendanceRecord.create({
         data: { studentId: student.id, sessionId: sessions[i].id, status: absent ? AttendanceStatus.ABSENT : AttendanceStatus.PRESENT, checkedAt: absent ? null : sessions[i].startsAt },
       });
     }
   }
 
-  // Материали за лекции 4 и 5 (backend/uploads)
+  // Материали за лекции 2, 4 и 5 (backend/uploads)
   const uploadDir = path.resolve(process.cwd(), 'uploads');
   fs.mkdirSync(uploadDir, { recursive: true });
   const materials = [
+    { session: sessions[1], title: 'MVC Notes', fileName: 'mvc.md', text: '# MVC\nModel–View–Controller splits an application into three parts. The Model holds the data and business rules, the View renders the data for the user, and the Controller handles user input, updates the Model and selects the View. Benefits include separation of concerns, parallel development and easier testing; in complex applications the Controller can grow too large.' },
     { session: sessions[3], title: 'Repository Pattern Notes', fileName: 'repository-pattern.md', text: '# Repository Pattern\nThe Repository pattern separates domain logic from persistence details. A repository exposes collection-like operations while hiding database-specific queries. Benefits include testability and separation of concerns; drawbacks include unnecessary abstraction in very simple systems.' },
     { session: sessions[4], title: 'Microservices Basics Notes', fileName: 'microservices-basics.md', text: '# Microservices Basics\nA microservice architecture structures an application as independently deployable services around business capabilities. Each service owns its data and communicates through explicit APIs or messaging. Benefits include independent deployment and scaling. Costs include distributed-system complexity, observability, network failures, data consistency and operational overhead.' },
   ];
@@ -105,6 +127,11 @@ async function main() {
     ]
   }});
 
+  // Smart Catch-up за Анна (MVC) през AI услугата: OpenAI при ключ с кредит, иначе резервен пакет по конспекта
+  const ai = new AiService(new ConfigService(), prisma as PrismaService);
+  await ai.generateCatchup(sessions[1].id, anna.id);
+
+  // Данни за вход и ID-та на лекциите за RFID моста
   console.log('Seed complete.');
   console.log('Student: anna@uni.demo / Student123!');
   console.log('Student: boris@uni.demo / Student123!');

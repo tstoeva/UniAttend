@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 
+// Модул за вход: JWT токени (валидни 8 часа) и guards за защита на адресите
 @Global()
 @Module({
   imports: [JwtModule.registerAsync({

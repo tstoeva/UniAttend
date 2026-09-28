@@ -15,11 +15,12 @@
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 
+// Четец и дисплей
 MFRC522 rfid(SS_PIN, RST_PIN);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 bool displayReady = false; // без дисплей буферът не е заделен, затова showMessage не рисува
 
-// Дисплеят може да е на 0x3C или 0x3D
+// Търси дисплея по I2C (адрес 0x3C или 0x3D)
 bool startDisplay() {
   const uint8_t addresses[] = {0x3C, 0x3D};
   for (uint8_t address : addresses) {
@@ -34,6 +35,7 @@ bool startDisplay() {
   return false;
 }
 
+// Изписва съобщение на дисплея
 void showMessage(const char* message) {
   if (!displayReady) return;
   display.clearDisplay();
@@ -44,6 +46,7 @@ void showMessage(const char* message) {
   display.display();
 }
 
+// Инициализация: серийна връзка, дисплей и четец
 void setup() {
   Serial.begin(115200);
   Wire.begin(21, 22);
@@ -56,10 +59,12 @@ void setup() {
   Serial.println("Present a 13.56 MHz RFID tag...");
 }
 
+// Основен цикъл: изчаква карта и изпраща нейния UID
 void loop() {
   if (!rfid.PICC_IsNewCardPresent()) return;
   if (!rfid.PICC_ReadCardSerial()) return;
 
+  // UID във формат XX:XX:XX:XX
   Serial.print("UID: ");
   for (byte i = 0; i < rfid.uid.size; i++) {
     if (rfid.uid.uidByte[i] < 0x10) Serial.print("0");
@@ -69,6 +74,7 @@ void loop() {
   Serial.println();
   showMessage("Attendance\nrecorded");
 
+  // Край на комуникацията с картата и пауза преди следващата
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
   delay(2000);

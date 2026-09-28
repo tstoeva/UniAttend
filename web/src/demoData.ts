@@ -2,6 +2,7 @@
 
 export type LessonStatus = 'present' | 'missed' | 'upcoming'; // зелено / червено / жълто квадратче
 
+// Предмет в таб „Присъствия“
 export type DemoSubject = {
   id: string;
   courseName: string;
@@ -24,12 +25,12 @@ export const demoSubjects: DemoSubject[] = [
     assistant: 'Ас. Петър Колев',
     semester: 'Семестър 1',
     catchupInfo: 'Отработка: 12.09.2026, 14:00, зала 301 или 19.09.2026, 10:00, зала 204',
-    exerciseSlots: ['present', 'present', 'present', 'present', 'missed'],
+    exerciseSlots: ['present', 'present', 'present', 'missed', 'upcoming'],
     slots: [
       { id: 'sa-1', title: 'Въведение в архитектурата', status: 'present', aiSummary: 'Лекцията въвежда основните архитектурни принципи, разделяне на отговорности и изграждане на мащабируеми системи.' },
       { id: 'sa-2', title: 'Многослойна архитектура', status: 'present', aiSummary: 'Структурният модел разделя приложението на презентационен, бизнес и данни слой за по-добра поддръжка и тестируемост.' },
       { id: 'sa-3', title: 'Архитектурни шаблони', status: 'missed', aiSummary: 'AI резюме: Архитектурните шаблони помагат за стандартизиране на логиката и намаляване на зависимостите между компоненти. Важно е да се познават MVC, MVVM и Repository моделите.' },
-      { id: 'sa-4', title: 'Платформа и интеграция', status: 'upcoming', aiSummary: 'Предстоящата тема ще разглежда взаимодействието между системни компоненти и API слоевете.' },
+      { id: 'sa-4', title: 'Платформа и интеграция', status: 'present', aiSummary: 'Предстоящата тема ще разглежда взаимодействието между системни компоненти и API слоевете.' },
       { id: 'sa-5', title: 'Микросервизни модели', status: 'upcoming', aiSummary: 'Темата ще обясни как микросервисите организират логиката и как се управлява комуникацията между услуги.' },
     ],
   },
@@ -41,7 +42,7 @@ export const demoSubjects: DemoSubject[] = [
     assistant: 'Гл. ас. Весела Маринова',
     semester: 'Семестър 1',
     catchupInfo: 'Няма нужда от отработка',
-    exerciseSlots: ['present', 'present', 'present', 'present', 'present'],
+    exerciseSlots: ['present', 'present', 'present', 'present', 'upcoming'],
     slots: [
       { id: 'db-1', title: 'Нормални форми', status: 'present', aiSummary: 'Нормализацията намалява дублирането и повишава консистентността на данните в релационните системи.' },
       { id: 'db-2', title: 'Индекси и оптимизация', status: 'present', aiSummary: 'Индексите ускоряват търсенето, но изискват балансиране между скорост и разход на дисково пространство.' },
@@ -62,8 +63,8 @@ export const demoSubjects: DemoSubject[] = [
     slots: [
       { id: 'hci-1', title: 'Основи на UX', status: 'present', aiSummary: 'UX акцентът е върху яснотата, удобството и последователността на потребителското взаимодействие.' },
       { id: 'hci-2', title: 'Потребителски изследвания', status: 'missed', aiSummary: 'AI резюме: Изследването на потребителите анализира нуждите, сценарии и бариери, за да се проектира по-подходящ интерфейс.' },
-      { id: 'hci-3', title: 'Визуална йерархия', status: 'upcoming', aiSummary: 'Темата ще разгледа подреждането на контента, контрастността и логическата структура на интерфейса.' },
-      { id: 'hci-4', title: 'Достъпност', status: 'upcoming', aiSummary: 'Ще се обсъжда как интерфейсът да е разбираем и използваем за широк кръг потребители.' },
+      { id: 'hci-3', title: 'Визуална йерархия', status: 'present', aiSummary: 'Темата ще разгледа подреждането на контента, контрастността и логическата структура на интерфейса.' },
+      { id: 'hci-4', title: 'Достъпност', status: 'present', aiSummary: 'Ще се обсъжда как интерфейсът да е разбираем и използваем за широк кръг потребители.' },
       { id: 'hci-5', title: 'Тестване на интерфейс', status: 'upcoming', aiSummary: 'Следващото занятие ще разгледа тестови сценарии и методи за оценяване на потребителския опит.' },
     ],
   },
@@ -75,7 +76,7 @@ export const demoSubjects: DemoSubject[] = [
     assistant: 'Гл. ас. Цветелина Ангелова',
     semester: 'Семестър 1',
     catchupInfo: 'Отработка: 16.09.2026, 14:00, зала 305 или 23.09.2026, 10:00, зала 210',
-    exerciseSlots: ['present', 'present', 'present', 'present', 'missed'],
+    exerciseSlots: ['present', 'present', 'present', 'missed', 'upcoming'],
     slots: [
       { id: 'ml-1', title: 'Supervised learning', status: 'present', aiSummary: 'Изучават се модели, които се обучават върху маркирани данни и оптимизират грешката чрез повтарящи се итерации.' },
       { id: 'ml-2', title: 'Класификация', status: 'present', aiSummary: 'Класификационните модели предсказват категория на наблюдението според неговите признаци и обучаващи примери.' },

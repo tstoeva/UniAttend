@@ -30,10 +30,10 @@ UniAttend AI is a university attendance platform with:
 There is currently **no lecturer UI/endpoint to create a new session or upload materials** — sessions and materials come from the seed data (`backend/prisma/seed.ts`). Add a session directly via `prisma studio` or the seed script if you need more than the five seeded ones.
 
 ### AI (Smart Catch-up)
-- Uses the OpenAI Responses API when `OPENAI_API_KEY` is configured
-- Uploads lecturer files with purpose `user_data`, supplies them as `input_file`
+- Uses the OpenAI Chat Completions API when `OPENAI_API_KEY` is configured
+- Sends the text of the lecturer materials (and the topic outline from the syllabus) in the prompt
 - Uses strict JSON Schema output for summary/key concepts/quiz (exactly 5 questions)
-- Deterministic demo fallback works with no API key, so the demo never depends on an external service
+- Deterministic fallback package when there is no API key or the API call fails, so the demo never depends on an external service
 
 ### Prototype / not currently active
 - **QR credential & Apple Wallet pass** — the backend module for this was removed; the web "Card" tab and the `wallet/` folder are kept only as a visual mock-up / future-direction reference.
@@ -205,6 +205,7 @@ Edit `backend/.env`:
 ```env
 OPENAI_API_KEY="YOUR_API_KEY"
 OPENAI_MODEL="gpt-5.6"
+# OPENAI_BASE_URL="..."   # optional: another OpenAI-compatible endpoint
 ```
 
 Restart backend.

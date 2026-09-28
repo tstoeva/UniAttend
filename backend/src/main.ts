@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
+// Стартира сървъра: CORS, префикс /api, валидация на входните данни и порт от .env
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({ origin: true, credentials: true });

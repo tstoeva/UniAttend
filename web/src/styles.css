@@ -1,4 +1,5 @@
-﻿:root {
+﻿/* Цветове и общи стилове */
+:root {
   --primary: #183d68;
   --primary-soft: #edf3ff;
   --primary-deep: #123a5c;
@@ -39,6 +40,7 @@ input {
   font: inherit;
 }
 label { display: grid; gap: 6px; margin: 12px 0; }
+/* Страница за вход и общи контейнери */
 .center {
   min-height: 100vh;
   display: grid;
@@ -47,8 +49,7 @@ label { display: grid; gap: 6px; margin: 12px 0; }
 }
 .shell { max-width: 1180px; margin: auto; padding: 28px; }
 .login { max-width: 500px; width: 100%; padding: 32px; }
-.login h1,
-.login > .muted { text-align: center; }
+.login h1 { text-align: center; }
 .login form > button { margin-bottom: 10px; }
 .brand { font-weight: 900; font-size: 24px; }
 .muted { color: var(--muted); }
@@ -58,6 +59,7 @@ label { display: grid; gap: 6px; margin: 12px 0; }
 .actions,
 .row { display: flex; gap: 10px; align-items: center; }
 .row { justify-content: space-between; }
+/* Карти, горна лента и заглавен блок */
 .card {
   background: white;
   border: 1px solid var(--line);
@@ -86,6 +88,7 @@ header {
 .score strong { font-size: 34px; }
 .score span { opacity: .75; }
 .eyebrow { font-size: 12px; font-weight: 900; letter-spacing: .12em; opacity: .65; }
+/* Лекторски панел: карти на лекциите и списък със студенти */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .att-row {
   display: flex;
@@ -113,6 +116,13 @@ header {
 .pill.absent { background: #f9dfe1; color: #8e2b39; }
 .pill.late { background: #fff0c9; color: #8a5d08; }
 .pill.excused { background: #e5ebff; color: #314a97; }
+/* Конспект на курса */
+.syllabus { margin-top: 20px; }
+.syllabus .row { align-items: flex-start; }
+.syllabus h3 { margin: 0 0 6px; }
+.syllabus .button-link { white-space: nowrap; }
+.syllabus input[type="file"] { flex: 1; }
+/* Студентски портал: табове, панели и етикети */
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
 .student-hero { background: linear-gradient(135deg, #123a5c, #214a7a); }
 .tab-bar { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 24px; }
@@ -141,9 +151,19 @@ header {
   font-size: 12px;
   font-weight: 700;
 }
+/* Дясната част на заглавието: ред текст (по избор) и етикет */
+.panel-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  text-align: right;
+}
+.panel-note { margin: 0; color: var(--muted); font-size: 14px; }
 .status-ok { background: #eaf3ff; color: #1b4d88; }
 .status-neutral { background: #eef2f7; color: #4b5a73; }
 .status-warning { background: #fff1cf; color: #8a5b06; }
+/* Таб „Лична информация“ */
 .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 .info-item {
   padding: 16px;
@@ -157,6 +177,7 @@ header {
   font-size: 12px;
   margin-bottom: 8px;
 }
+/* Табове „Предмети и оценки“ и „Присъствия“ */
 .subject-list, .attendance-list { display: grid; gap: 16px; }
 .subject-card {
   display: grid;
@@ -222,6 +243,7 @@ header {
 }
 .full-attendance-check:hover { transform: translateY(-1px); }
 .attendance-badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Прозорец „Пълно присъствие“ и етикети */
 .attendance-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -287,6 +309,7 @@ header {
 }
 .mini-badge.success { background: #def1ff; color: #1b4d88; }
 .mini-badge.danger { background: #f9dfe1; color: #8e2b39; }
+/* Упражнения */
 .attendance-row {
   display: grid;
   grid-template-columns: 120px 1fr 2fr;
@@ -336,6 +359,7 @@ header {
 }
 .exercise-complete { color: #166b45 !important; }
 .exercise-warning { color: #8b5e08 !important; }
+/* Квадратчета за лекции и упражнения */
 .session-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -366,6 +390,7 @@ header {
   font-size: 12px;
   margin-top: 6px;
 }
+/* AI резюме и Smart Catch-up */
 .summary-box {
   margin-top: 20px;
   border: 1px solid #dfeaf7;
@@ -389,11 +414,17 @@ header {
 }
 .summary-status.missed { background: #ffe0e3; color: #8b2d3a; }
 .catchup-wrap { margin-top: 20px; }
+/* Smart Catch-up: ключови понятия и тест */
+.catchup .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.catchup .chips span { background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+.catchup .question { margin: 16px 0; }
+.catchup .question b { display: block; margin-bottom: 6px; }
+.catchup .option { display: flex; align-items: center; gap: 10px; margin: 6px 0; cursor: pointer; }
+.catchup .option input { width: auto; margin: 0; padding: 0; }
+/* Таб „Карта за присъствие“ */
 .card-layout {
-  display: grid;
-  grid-template-columns: 1.2fr .8fr;
-  gap: 20px;
-  align-items: center;
+  display: flex;
+  justify-content: center; /* картата е в средата */
 }
 .wallet-card {
   background: linear-gradient(135deg, #12395f, #1d4c8c 38%, #123a5c);
@@ -431,25 +462,12 @@ header {
   background: linear-gradient(135deg, #f3d774, #d4a93b);
   box-shadow: inset 0 0 0 2px rgba(0,0,0,.08);
 }
-.qr-block { text-align: center; }
-.qr-block p { color: #5a6a62; margin: 12px 0; }
-.prototype-placeholder {
-  width: 180px;
-  height: 180px;
-  margin: 0 auto;
-  display: grid;
-  place-items: center;
-  border: 2px dashed #c8d5e4;
-  border-radius: 12px;
-  color: #60758a;
-  background: #f7f9fc;
-  font-weight: 700;
-}
 .loading-card { padding: 22px 30px; text-align: center; }
+/* Мобилни екрани */
 @media (max-width: 700px) {
   .subject-card { grid-template-columns: 1fr; }
   .attendance-row,
   .exercise-row { grid-template-columns: 1fr; }
-  .card-layout { grid-template-columns: 1fr; }
   .panel-header { flex-direction: column; align-items: flex-start; }
+  .panel-aside { align-items: flex-start; text-align: left; }
 }

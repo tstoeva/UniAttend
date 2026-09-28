@@ -5,12 +5,13 @@ import { RfidCheckInDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 
+// Адреси за присъствия (/api/attendance)
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AttendanceController {
   constructor(private attendance: AttendanceService) {}
 
-  // Извиква се от RFID моста (terminal/rfid_terminal.py)
+  // Чекиране с RFID карта – извиква се от моста terminal/rfid_terminal.py
   @Post('rfid-check-in')
   @Roles(Role.LECTURER)
   rfidCheckIn(@Body() dto: RfidCheckInDto) {

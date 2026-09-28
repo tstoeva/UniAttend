@@ -1,6 +1,7 @@
 import { SessionStatus } from '@prisma/client';
 import { checkInAllowed } from './policies';
 
+// Тестове за правилото за чекиране
 describe('attendance policies', () => {
   it('allows enrolled student only in open session', () => {
     expect(checkInAllowed(SessionStatus.OPEN, true)).toBe(true);
